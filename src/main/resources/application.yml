@@ -1,2 +1,6 @@
 server:
   port: 8095
+
+spring:
+  servlet:
+    multipart.max-file-size: 5000000
