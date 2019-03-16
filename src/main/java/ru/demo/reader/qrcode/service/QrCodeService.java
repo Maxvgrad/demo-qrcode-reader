@@ -13,25 +13,51 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
 
 @Slf4j
 @Service
 public class QrCodeService {
 
-    public String read(MultipartFile qrCode) throws Exception {
+    public String decode(MultipartFile qrCodeImageFile) throws IOException {
+        validate(qrCodeImageFile);
+        return decodeInternal(qrCodeImageFile.getInputStream());
+    }
 
-        BufferedImage bufferedImage = ImageIO.read(qrCode.getInputStream());
-
-        LuminanceSource source = new BufferedImageLuminanceSource(bufferedImage);
-        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-
+    private String decodeInternal(InputStream qrCodeInputStream) {
+        BufferedImage bufferedImage = readImage(qrCodeInputStream);
+        BinaryBitmap bitmap = convert(bufferedImage);
         try {
             Result result = new MultiFormatReader().decode(bitmap);
             return result.getText();
         } catch (NotFoundException e) {
-            log.debug("There is no QR code in the image");
-            throw new IllegalArgumentException("There is no QR code in the image");
+            log.warn("#decode: There is no QR code in the image");
+            throw new IllegalArgumentException("There is no QR code in the image.");
         }
+    }
 
+    private BufferedImage readImage(InputStream io) {
+        try {
+            return ImageIO.read(io);
+        } catch (IOException ex) {
+            log.error("#readImage:", ex);
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private BinaryBitmap convert(BufferedImage image) {
+        LuminanceSource source = new BufferedImageLuminanceSource(image);
+        return new BinaryBitmap(new HybridBinarizer(source));
+    }
+
+    private void validate(MultipartFile file) {
+        Objects.requireNonNull(file, "file");
+
+        if (file.isEmpty()) {
+            log.warn("#validate: empty file({})", file.getOriginalFilename());
+            throw new IllegalArgumentException("File is empty.");
+        }
     }
 }
